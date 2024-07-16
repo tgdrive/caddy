@@ -1,6 +1,6 @@
 FROM caddy:builder-alpine AS builder
 
-RUN xcaddy build --with github.com/divyam234/forwardproxy
+RUN xcaddy build --with github.com/divyam234/forwardproxy@master
 
 FROM caddy:alpine
 
