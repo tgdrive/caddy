@@ -87,5 +87,3 @@ jobs:
           tags: |
             ghcr.io/${{ env.IMAGE }}:latest
             ghcr.io/${{ env.IMAGE }}:${{ env.CADDY_VERSION_CLEAN }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
