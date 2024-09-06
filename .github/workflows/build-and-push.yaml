@@ -2,10 +2,11 @@ name: Build Docker Image
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'
 
 env:
-  REGISTRY: ghcr.io
-  GHCR_CONTAINER_PATH: ghcr.io/${{ github.actor }}/caddy
+  IMAGE: tgdrive/caddy
 
 jobs:
   build-and-push:
@@ -19,36 +20,64 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Fetch latest Caddy version
+        id: get-caddy-version
+        run: |
+          LATEST_VERSION=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/caddyserver/caddy/releases/latest | jq -r .tag_name)
+          CLEAN_VERSION=${LATEST_VERSION#v}
+          echo "CADDY_VERSION=${LATEST_VERSION}" >> $GITHUB_ENV
+          echo "CADDY_VERSION_CLEAN=${CLEAN_VERSION}" >> $GITHUB_ENV
+
+      - name: Check if image version already exists
+        id: check-image
+        run: |
+          IMAGE_TAGS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://ghcr.io/v2/${{ env.IMAGE }}/tags/list | jq -r '.tags[]')
+          if echo "$IMAGE_TAGS" | grep -q "${{ env.CADDY_VERSION_CLEAN }}"; then
+            echo "Image with version ${{ env.CADDY_VERSION_CLEAN }} already exists. Skipping build."
+            echo "BUILD=false" >> $GITHUB_ENV
+          else
+            echo "BUILD=true" >> $GITHUB_ENV
+
       - name: Login to GitHub Container Registry
+        if: env.BUILD == 'true'
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata (tags, labels) for Docker
+        if: env.BUILD == 'true'
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.GHCR_CONTAINER_PATH }}
-          tags: type=raw,value=latest
+          images: ${{ env.IMAGE }}
+          labels: |
+            org.opencontainers.image.version=${{ env.CADDY_VERSION_CLEAN }}
+            org.opencontainers.image.title=${{ env.IMAGE }}
+            org.opencontainers.image.description=Caddy Extended Image
 
       - name: Set up QEMU
+        if: env.BUILD == 'true'
         uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
 
       - name: Set up Docker Buildx
+        if: env.BUILD == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push Docker image
+        if: env.BUILD == 'true'
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            CADDY_VERSION=${{ env.CADDY_VERSION }}
           labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ghcr.io/${{ env.IMAGE }}:latest
+            ghcr.io/${{ env.IMAGE }}:${{ env.CADDY_VERSION_CLEAN }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

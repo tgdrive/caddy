@@ -1,6 +1,9 @@
 FROM caddy:builder-alpine AS builder
 
-RUN xcaddy build --with github.com/divyam234/forwardproxy@master
+ARG CADDY_VERSION
+
+RUN xcaddy build ${CADDY_VERSION} --with github.com/caddyserver/forwardproxy \
+   --with github.com/mholt/caddy-webdav
 
 FROM caddy:alpine
 
