@@ -31,12 +31,20 @@ jobs:
       - name: Check if image version already exists
         id: check-image
         run: |
-          IMAGE_TAGS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://ghcr.io/v2/${{ env.IMAGE }}/tags/list | jq -r '.tags[]')
-          if echo "$IMAGE_TAGS" | grep -q "${{ env.CADDY_VERSION_CLEAN }}"; then
-            echo "Image with version ${{ env.CADDY_VERSION_CLEAN }} already exists. Skipping build."
-            echo "BUILD=false" >> $GITHUB_ENV
+          RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://ghcr.io/v2/${{ env.IMAGE }}/tags/list)
+          if echo "$RESPONSE" | jq -e '.tags' > /dev/null; then
+            IMAGE_TAGS=$(echo "$RESPONSE" | jq -r '.tags[]')
+            if echo "$IMAGE_TAGS" | grep -q "${{ env.CADDY_VERSION_CLEAN }}"; then
+              echo "Image with version ${{ env.CADDY_VERSION_CLEAN }} already exists. Skipping build."
+              echo "BUILD=false" >> $GITHUB_ENV
+            else
+              echo "Proceeding to build new image."
+              echo "BUILD=true" >> $GITHUB_ENV
+            fi
           else
+            echo "No tags found or failed to fetch tags. Proceeding to build."
             echo "BUILD=true" >> $GITHUB_ENV
+          fi
 
       - name: Login to GitHub Container Registry
         if: env.BUILD == 'true'
