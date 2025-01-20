@@ -3,7 +3,6 @@ FROM caddy:builder-alpine AS builder
 ARG CADDY_VERSION
 
 RUN xcaddy build ${CADDY_VERSION} \
-   --with github.com/caddyserver/forwardproxy=github.com/klzgrad/forwardproxy@naive \
    --with github.com/mholt/caddy-webdav \
    --with github.com/caddy-dns/cloudflare \
    --with github.com/mholt/caddy-l4
